@@ -24,8 +24,7 @@ K=2000;
 xMin=0; xMax=10;
 yMin=0; yMax=10;
 
-e = 0.5;
-
+e = 0.25;
 constraints = [3      0      3       7;
                3     7+e     3       10;
                7      0      7      3-e;
@@ -37,17 +36,33 @@ constraints = [3      0      3       7;
              5+e/2    3    5+e/2    7+e;
              5+e/2   7+e     3      7+e];      
 
-
+polyg1 = [3       0;
+          3       7;
+        5-e/2     7;
+        5-e/2    3-e;
+          7      3-e;
+          7       0];
+      
+polyg2 = [3       10;
+          3      7+e;
+        5+e/2    7+e;
+        5+e/2      3;
+          7        3;
+          7       10];  
 
 figure(1); hold on; grid on;
 line([constraints(:,1)';constraints(:,3)'],[constraints(:,2)';constraints(:,4)'],'Color','k');
-
 axis([0 xMax 0 yMax]);
 
+graph.node = [];
+total_nodes = 0;
+count = 0;
 
-for iter = 1:1000
+for current = 1:1000
     % Randomize a new seed
-    [xRand,yRand,~] = feasible_randomizer(polyg1,polyg2);
+    [xRand,yRand,n] = feasible_randomizer(polyg1,polyg2);
+    total_nodes = total_nodes + n;
+    count = count + n;
     plot_rand = plot(xRand, yRand, 'ro', 'MarkerSize',3, 'MarkerFaceColor','r');
     
     % Find the neighborhood of the random node 
@@ -55,28 +70,34 @@ for iter = 1:1000
     for k = 1:length(graph.node)
         dist(k) = sqrt( (xRand-graph.node(k).x)^2 + (yRand-graph.node(k).y)^2 );
     end
-    ind = find(dist<0.2);
+    ind = find(dist<1);
     
     % Add node    
-    graph.node(iter).x = xRand;
-    graph.node(iter).y = yRand;
-    graph.node(iter).edge = [];
+    graph.node(current).x = xRand;
+    graph.node(current).y = yRand;
+    graph.node(current).edge = [];
     
-    % Connect to the neighborhood nodes
-    for j = 1:length(ind)
-        % Check intersection with the constraint 
-%         out = lineSegmentIntersect(constraints,[xNearest,yNearest,xRand,yRand]);   
-        out = lineSegmentIntersect(constraints,[graph.node(ind(j)).x, graph.node(ind(j)).y, xRand, yRand]);
-        intersect = find(out.intAdjacencyMatrix==1);
+    % Connect to the neighborhood nodes 
+    for i = ind        
+        [intersect,n] = connect([graph.node(i).x; graph.node(i).y], [xRand; yRand], polyg1, polyg2); 
+        count = count + n;
         
-        if isempty(intersect)==1
-            graph.node(ind(j)).edge = [graph.node(ind(j)).edge, iter]; 
-            graph.node(iter).edge = [graph.node(iter).edge, ind(j)];
-            plot([graph.node(ind(j)).x, xRand], [graph.node(ind(j)).y, yRand], 'r');            
+        % Connect if no constraint intersection 
+        if intersect==0
+            graph.node(i).edge = [graph.node(i).edge, current]; 
+            graph.node(current).edge = [graph.node(current).edge, i];
+            plot([graph.node(i).x, xRand], [graph.node(i).y, yRand], 'r');            
         end
+        
     end
+    
+%     if total_nodes>=1000
+%         current
+%         break
+%     end
+    
 end
-
+count
 %%
 e = 0.5;
 constraints = [3      0      3       7;
@@ -112,6 +133,21 @@ polyg2 = [3       10;
 [xRand,yRand,~] = feasible_randomizer(polyg1,polyg2);
 plot_rand = plot(xRand, yRand, 'ro', 'MarkerSize',3, 'MarkerFaceColor','r');
 
+%%
+x = [1;2];
+y = [2;2];
+% epsi = 0.3;
+% pts = pts_between(x,y,ceil(norm(x-y)/epsi)-1);
+% 
+% scatter(pts(:,1),pts(:,2),10,'r','filled')
+[intersect,count] = connect(x,y,polyg1,polyg2)
+% v = (y-x);
+% v = v/norm(v);
+hold on
+plot(polyg1(:,1),polyg1(:,2),'r')
+plot(polyg2(:,1),polyg2(:,2),'r')
+axis([0 10 0 10]);
+
 
 function [xRand,yRand,iter] = feasible_randomizer(polyg1,polyg2)
 
@@ -127,4 +163,45 @@ for iter=1:50
         break
     end
 end
+
 end
+
+function pts = pts_between(x,y,n_inner_points)
+xvals = linspace(x(1), y(1), n_inner_points+2);
+yvals = linspace(x(2), y(2), n_inner_points+2);
+pts = [xvals(:), yvals(:)];
+end
+
+function [intersect,count] = connect(x,y,polyg1,polyg2)
+epsi = 0.1;
+pts = pts_between(x,y,ceil(norm(x-y)/epsi)-1);
+pts = pts(2:end-1,:);
+
+intersect = 0;
+count = 0;
+
+if isempty(pts) == 0
+    
+    for j = 1:size(pts,1)
+        in1 = inpolygon(pts(j,1),pts(j,2),polyg1(:,1),polyg1(:,2));
+        in2 = inpolygon(pts(j,1),pts(j,2),polyg2(:,1),polyg2(:,2));
+        if in1==1 || in2==1
+            intersect = 1;
+            break
+        end
+    end
+    count = j;
+
+end
+
+
+end
+
+
+
+
+
+
+
+
+
